@@ -1,0 +1,8 @@
+ls -al
+wc prog.c batchProcessing.c
+whoami
+touch newfile.c
+cp prog.c newfile.c
+diff prog.c newfile.c
+rm prog.c
+gcc newfile.c -o newfile.exe

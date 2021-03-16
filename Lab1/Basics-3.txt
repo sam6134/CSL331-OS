@@ -1,0 +1,103 @@
+On pointers, virtual memory and dynamic memory in C
+
+1. How to use malloc,  free? 
+-pointer is a VARIABLE in C that stores addresses
+
+Simple pointer example:
+
+Example 1: How to understand pointers?
+
+#include<stdio.h>
+#include<stdlib.h>
+int main(int argc, char* argv[]){
+int *x;
+
+printf("Printing x: %d \n", x);
+
+ x=(int *)malloc(sizeof(int));
+
+printf("Printing x:%d, *x: %d\n ", x, *x);
+
+}
+
+Example 2: Common pitfalls in dereferencing pointers
+
+#include<stdio.h>
+#include<stdlib.h>
+int main(int argc, char* argv[]){
+int *x;
+
+printf("Printing x: %d, *x: %d \n", x, *x);
+
+printf("Printing x:%d, *x: %d\n ", x, *x);
+
+}
+
+
+Example 3: Pointer to a pointer showing how pointers are just another kind of C variables
+
+#include<stdio.h>.
+int main(int argc, char* argv[]){
+int *x;
+int **y;
+
+printf("Printing x: %d \n", x);
+
+x=(int *)malloc(sizeof(int));
+
+y=&x;
+
+printf("Printing x:%d, *x: %d, *y:%d,  **y:%d\n ", x, *x, *y, **y);
+
+}
+
+
+
+-Program memory
+
+All declared variables are stored in stack by C
+All dynamic memory/long-lived memory is obtained and stored in Heap.
+
+
+
+2. How to create linked list in C?
+
+Below is a sample template to initialize a linked list
+
+#include <stdlib.h>
+
+struct node {
+  int x;
+  struct node *next;
+};
+
+int main() 
+{
+    /* This will be the unchanging first node */
+    struct node *root;      
+
+    /* Now root points to a node struct */
+    root = (struct node *) malloc( sizeof(struct node) ); 
+
+    /* The node root points to has its next pointer equal to a null pointer 
+       set */
+    root->next = 0;  
+    /* By using the -> operator, you can modify what the node,
+       a pointer, (root in this case) points to. */
+    root->x = 5;     
+}
+
+
+Assignment: Create functions that 
+a) Insert a node in the list
+b) Remove a node from the list
+c) Print the entire list
+d) Delete the entire list
+
+
+Handling string copies
+
+char * src = "hello";
+char * dst = (char * ) malloc(strlen(src) + 1);
+strcpy(dst, src); // work properly
+

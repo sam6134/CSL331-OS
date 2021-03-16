@@ -1,0 +1,10 @@
+ls -al
+ping google.com
+echo Hello
+wc prog.c lab3.c
+whoami
+touch newfile.c
+cp prog.c newfile.c
+diff prog.c newfile.c
+rm prog.c
+gcc newfile.c -o newfile.out

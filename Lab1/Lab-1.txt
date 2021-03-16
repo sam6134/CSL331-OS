@@ -1,0 +1,42 @@
+Lab Task -1 
+
+Task : Write a C program to generate a set of N distinct random integers. N  is an input from the user.
+
+
+LCG: Xn=(aXn-1+b) mod c
+
+Rules:  X1=2, X2=(aX1+b) mod c, X3=(aX2+b) mod c
+
+1. Own method: XOR + bit-shift/any other
+2. LCG Method: Xn=(aXn-1+b) mod c
+3. Lagged Fibonacci method: Xi=Xi-p*Xi-q  (p, q) are basically called lags
+
+Criteria:
+1. Numbers should not exhibit easily recognizable patterns. Some patterns are:
+a. Falling within same range [0-10] or [0-100] or etc..
+b. Having same number of digits
+c. Having repetitions or large period
+d. Should not blindly use rand() function. Should explain how they are generating the random numbers/strings.
+
+Task :Write a C program to generate a set of N distinct random strings. 
+
+Grading Criteria:
+1. Characters must be printable on screen.
+2. Should not repeat strings or characters too many times.
+
+Task: Implement a stack that will store  Integers
+
+Grading Criteria:
+1. Show the basic operations: push, pop, display
+2. Test for 5 to 10 integers.
+
+Additional Useful Notes
+Include a program that checks that the output really does consist of distinct values.
+
+Libraries of relevance
+stdio.h
+stdlib.h
+time.h
+
+Library functions: rand(), srand(seed), time() 
+scanf()

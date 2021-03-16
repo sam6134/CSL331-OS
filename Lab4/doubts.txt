@@ -1,0 +1,6 @@
+-!HIST4 does it executes the 4th command from the last or from first.
+
+pid, cd, HIST does it need to be in the pid all list 
+(since we dont spawn them)
+
+does !HIST commands need to be in history (infinite loop)
