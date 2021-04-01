@@ -6,6 +6,8 @@
 #include<fcntl.h>
 #include<signal.h>
 #include<time.h>
+#include<pthread.h>
+
 
 // Node Structure for Storing Commands
 struct PTE{
@@ -53,7 +55,29 @@ struct MainMemory
 };
 
 struct MainMemory* main_memory;
-// Lagged Fibonacci generator for random generation of virtual address spaces
+int done = 0;
+
+// reset function called on each timer
+void reset_use_bits()
+{
+     for(int i = 0; i <TLB_SIZE; i++)
+     {
+         TLB[i].use = 0;
+     }
+     return;
+}
+
+// thread proccess for timer function ( to be called after every 1ms)
+void *threadproc(void *arg)
+{
+    while(!done)
+    {
+        usleep(1000);
+        reset_use_bits();
+    }
+    return 0;
+}
+
 int max(int a,int b){
     if(a>b) return a;
     else return b;
@@ -62,7 +86,7 @@ int max(int a,int b){
 
 union Page AccessMemory(uint32_t Phy_addr, int pte_bit)
 {
-    usleep(100000);
+     for(int i=0;i<1000000;i++); // extra time to give real time delays in memory access
     if(pte_bit)
     {
         int idx = (Phy_addr/(sizeof(struct PTE)));
@@ -75,8 +99,10 @@ union Page AccessMemory(uint32_t Phy_addr, int pte_bit)
 
 int CanAccess(unsigned int protected_bits)
 {
-    if((protected_bits >> 2) == 1) return 1;
-    return 0;
+    // accessed if any of the three read/ write and execute are  not protected
+    // other protection fault is raised
+    if(protected_bits  == 7) return 0;
+    return 1;
 }
 
 struct TLB_Entry TLB_Lookup(uint32_t VPN, int* success){
@@ -175,12 +201,36 @@ void populate_page_table(int n)
     srand(time(NULL));
     for(int i=0; i<n; i++)
     {
-        main_memory[0].pf.pages[i].page_table_entry.PFN = 1 + (rand()%(1<<13)); // won't allocate pf 0 (since it contains TLB)
-        main_memory[0].pf.pages[i].page_table_entry.valid = 1;
-        main_memory[0].pf.pages[i].page_table_entry.dirty = rand()%2;
-        main_memory[0].pf.pages[i].page_table_entry.mode = rand()%2;
-        main_memory[0].pf.pages[i].page_table_entry.present = rand()%2;
-        main_memory[0].pf.pages[i].page_table_entry.protected = 7;
+        // won't allocate pf 0 (since it contains TLB)
+        main_memory[0].pf.pages[i].page_table_entry.PFN = 1 + (rand()%(1<<13)); 
+
+        // setting up valid bit 0 with 0.005 probability
+        if(rand()%500 == 0){
+            main_memory[0].pf.pages[i].page_table_entry.valid = 0;
+        }
+        else{
+           main_memory[0].pf.pages[i].page_table_entry.valid = 1; 
+        }
+        // initially bits are not dirty
+        main_memory[0].pf.pages[i].page_table_entry.dirty = 0;
+
+        // assuming all are in user mode
+        main_memory[0].pf.pages[i].page_table_entry.mode = 0;
+
+        // assuming enough memmory for this particular process
+        main_memory[0].pf.pages[i].page_table_entry.present = 1;
+
+        main_memory[0].pf.pages[i].page_table_entry.protected = 0;
+        // adding read/ write and execute protected with probability 0.01
+        if(rand()%100 == 0){
+             main_memory[0].pf.pages[i].page_table_entry.protected += 1;
+        }
+        if(rand()%100 == 0){
+             main_memory[0].pf.pages[i].page_table_entry.protected += (1<<1);
+        }
+        if(rand()%100 == 0){
+             main_memory[0].pf.pages[i].page_table_entry.protected += (1<<2);
+        }
     }
 }
 
@@ -241,34 +291,82 @@ int main(int argc, char* argv[])
     for(int i=0; i<(1<<14);i++){
         main_memory[i].pf.pages = (union Page *)malloc(sizeof(union Page)*(1<<10)); 
     }
-    printf("Enter number of virtual addresses to generate\n");
-    scanf("%d", &n);
-    printf("Enter TLB size: \n");
-    scanf("%d", &TLB_SIZE);
     srand(time(NULL));
-    TLB = (struct TLB_Entry *) malloc(TLB_SIZE*sizeof(struct TLB_Entry));
+    
     uint32_t* arr = (uint32_t*) malloc(n*sizeof(uint32_t));
-    for(int i=0;i<n;i++){
-        arr[i] = genLCG();
-    }
     int s = (1<<6);
     populate_page_table(s);
-    printf("Chk1 %d\n",main_memory[0].pf.pages[0].page_table_entry.PFN);
-    printf("Got-%d\n",(convert_to_physical(0)>>PFN_SHIFT) );
-    double tot_time = 0;
-    for(int i=0;i<n;i++){
+
+    // printf("Chk1 %d\n",main_memory[0].pf.pages[0].page_table_entry.PFN);
+    // printf("Got-%d\n",(convert_to_physical(0)>>PFN_SHIFT) );
+
+    int num_of_pages [] = {25,50,75,100};
+    int tlb_sizes[] = {8,16,32};
+    double* avg_time = malloc(12*(sizeof(double)));
+
+    int avg_time_idx = 0;
+
+    for(int j=0;j<4;j++){
+        n = num_of_pages[j]; 
+        uint32_t* arr = (uint32_t*) malloc(n*sizeof(uint32_t));
+
         
-        printf("The Virtual Address is ");
-        print_binary(arr[i], 1);
-        start = time(NULL);
-        uint32_t physical_addr = convert_to_physical(arr[i]);
-        end = time(NULL);
-        if(physical_addr != -1){
-            printf("Converted Physical Address is ");
-            print_binary(physical_addr, 0);
+        for(int k=0;k<3;k++){
+
+            TLB_SIZE = tlb_sizes[k];
+            printf("Number of pages to be accessed: %d with TLB size %d\n\n\n",n, tlb_sizes[k]);
+
+            for(int i=0;i<10;i++){
+
+                TLB = (struct TLB_Entry *) malloc(TLB_SIZE*sizeof(struct TLB_Entry));
+                printf("Trial %d\n\n",i+1);
+
+                for(int i=0;i<n;i++){
+                    arr[i] = genLCG();
+                }
+
+                double tot_time = 0;
+                // printf("Chk1 %d\n",main_memory[0].pf.pages[0].page_table_entry.PFN);
+                // printf("Got-%d\n",(convert_to_physical(0)>>PFN_SHIFT) );
+                for(int i=0;i<n;i++){
+                    
+                    printf("The Virtual Address is ");
+                    print_binary(arr[i], 1);
+                    start = clock();
+                    uint32_t physical_addr = convert_to_physical(arr[i]);
+                    end = clock();
+                    if(physical_addr != -1){
+                        printf("Converted Physical Address is ");
+                        print_binary(physical_addr, 0);
+                    }else{
+                        break;
+                    }
+                    tot_time += ((end-start)*1000)/CLOCKS_PER_SEC;
+                }
+                avg_time[avg_time_idx] += tot_time;
+                printf("Trial %d ended\n", i+1);
+                printf("===============================================\n\n");
+                free(TLB);
+            }
+
+            printf("Total access time for %d pages with TLB size %d, (avgd for 10 trials) - %f ms\n", n,TLB_SIZE,avg_time[avg_time_idx]/10);
+            printf("===============================================\n\n\n\n");
+            avg_time_idx++;
         }
-        tot_time += (end-start);
+        free(arr);
     }
-    printf("Total average access time is - %f\n",(double)(tot_time/n));
+    printf("----FINAL RESULT SUMMARY---\n\n");
+    avg_time_idx = 0;
+    for(int i=0;i<4;i++)
+    {
+        printf("Total access time for %d pages, (avgd for 10 trials)\n",num_of_pages[i]);
+        for(int j=0;j<3;j++)
+        {
+            printf("TLB size %d - %f ms\n", tlb_sizes[j],avg_time[avg_time_idx]/10);
+            avg_time_idx ++;
+        }
+        printf("\n");   
+    }
+    printf("Simualtion ended !! \n\n");
     return 0;
 }

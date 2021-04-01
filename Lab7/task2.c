@@ -20,7 +20,12 @@ typedef struct __myret_t
 
 } myret_t;
 
-
+struct new_struct
+{
+    int a;
+    char* s1;
+    char* s2;
+};
 
 void * mythread(void * arg) {
     myarg_t * m = (myarg_t * ) arg;
@@ -35,12 +40,27 @@ void * mythread(void * arg) {
     return (void * ) r;
 }
 
+void * mythread_concat(void * arg) {
+    struct new_struct * m = (struct new_struct * ) arg;
+    char* new_string = (char*) malloc(strlen(m->s1)+strlen(m->s2)+1);
+    strcat(new_string,m->s1);
+    strcat(new_string,m->s2);
+    int print_index=0;
+    for(print_index=0; print_index<m->a; print_index++)
+    {
+        printf("Printing %d th character %c\n", print_index, *(new_string+print_index));
+    }
+    myret_t * r = malloc(sizeof(myret_t));
+    r->x = 1;
+    r->y = new_string;
+    return (void * ) r;
+}
  
 
 int  main(int argc, char * argv[]) 
 {
     //int rc;
-    pthread_t p1,p2;
+    pthread_t p1,p2, p3;
     myret_t* m;
     myarg_t args1,args2;
 
@@ -53,12 +73,17 @@ int  main(int argc, char * argv[])
 
     strcpy(args1.b,  argv[1]);
     strcpy(args2.b,  argv[2]);
-
+    struct new_struct to_pass;
     pthread_create(&p1, NULL, mythread, &args1);
     pthread_create(&p2,NULL,mythread,&args2);
     pthread_join(p1, (void ** ) &m);
+    to_pass.s1 = m->y;
+    to_pass.a += m->x;
     pthread_join(p2,(void ** ) &m);
+    to_pass.s2 = m->y;
+    to_pass.a += m->x;
+    pthread_create(&p3,NULL,mythread_concat,&to_pass);
+    pthread_join(p3,(void ** ) &m);
     printf("returned %d %s\n", m->x, m->y);
-    
     return 0;
 }
