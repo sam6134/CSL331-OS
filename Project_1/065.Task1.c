@@ -9,30 +9,34 @@
 
 // Node Structure for Storing Commands
 struct PTE{
-    unsigned int PFN: 14;
-    unsigned int valid : 1;
-    unsigned int present : 1;
-    unsigned int protected : 3;
-    unsigned int dirty : 1;
-    unsigned int mode : 1;
+    unsigned int PFN: 14; // a 14 bit PFN
+    unsigned int valid : 1; // a 1 bit valid
+    unsigned int present : 1; // a 1 bit present
+    unsigned int protected : 3; // a 3 bit protected r/w/e
+    unsigned int dirty : 1; // a 1 bit dirty
+    unsigned int mode : 1; // a 1 bit mode
 };
 
-
+// declare masks
 uint32_t VPN_MASK = 0xFC00;
 uint32_t PFN_MASK = 0xFFFC00;
 uint32_t SHIFT = 10;
 uint32_t OFFSET_MASK = 0x3FF;
 uint32_t PFN_SHIFT = 10;
 
+
+// a union page structure
 union Page{
     int data;
     struct PTE page_table_entry;
 };
 
+// page frame structure to store array of pages
 struct PageFrame{
     union Page* pages;
 };
 
+// main memory struct
 struct MainMemory
 {
    struct PageFrame pf; 
@@ -70,20 +74,27 @@ int CanAccess(unsigned int protected_bits)
 
 uint32_t convert_to_physical(uint32_t virtual_addr)
 {
+    // extract VPN
     uint32_t VPN = (virtual_addr & VPN_MASK) >> SHIFT;
+    // calculate PTE_ADDR
     uint32_t PTE_ADDR = (VPN*sizeof(struct PTE));
+    // get the page table entry
     struct PTE Page_table_entry = AccessMemory(PTE_ADDR, 1).page_table_entry;
     if(Page_table_entry.valid == 0)
     {
+        // if not valid
         printf("\n\n**SEGMENTATION_FAULT**\n\n");
         return -1;
     }
     if(CanAccess(Page_table_entry.protected) == 0)
     {
+        // if cannot access
         printf("\n\n**PROTECTION_FAULT**\n\n");
         return -1;
     }
+    // calculate offset
     uint32_t offset = virtual_addr & OFFSET_MASK;
+    // calculate physical address
     uint32_t PhyAddr = (Page_table_entry.PFN << PFN_SHIFT) | offset;
     AccessMemory(PhyAddr,0);
     return PhyAddr;
@@ -129,6 +140,7 @@ void populate_page_table(int n)
     }
 }
 
+// print the address in the binary format
 void print_binary(uint32_t address, int virtual)
 {
     int* binary = malloc(sizeof(int)*24);
@@ -141,18 +153,21 @@ void print_binary(uint32_t address, int virtual)
     }
     if(virtual)
     {
+        // if virtual address print the VPN ( array starts from 8th index in case of virtual address)
         for(int i=8;i<=13;i++)
         {
             printf("%d",binary[i]);
         }
         printf("|");
     }else{
+        // if physical address print the PFN
         for(int i=0;i<=13;i++)
         {
             printf("%d",binary[i]);
         }
         printf("|");
     }
+    // print the rest of the offset
     for(int i=14;i<24;i++) printf("%d", binary[i]);
     printf("\n");
 }
@@ -192,6 +207,7 @@ int main(int argc, char* argv[])
     int num_of_pages [] = {25,50,75,100};
     double* avg_time = malloc(4*(sizeof(double)));
     for(int j=0;j<4;j++){
+        // loop for each number of pages
         n = num_of_pages[j]; 
         printf("Number of pages to be accessed: %d\n\n\n",n);
         uint32_t* arr = (uint32_t*) malloc(n*sizeof(uint32_t));

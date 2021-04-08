@@ -29,11 +29,7 @@ struct new_struct
 
 void * mythread(void * arg) {
     myarg_t * m = (myarg_t * ) arg;
-    int print_index=0;
-    for(print_index=0; print_index<m->a; print_index++)
-    {
-        printf("Printing %d th character %c\n", print_index, *(m->b+print_index));
-    }
+    printf("String for this thread - %s\n\n", m->b);
     myret_t * r = malloc(sizeof(myret_t));
     r->x = 1;
     r->y = m->b;
@@ -43,13 +39,10 @@ void * mythread(void * arg) {
 void * mythread_concat(void * arg) {
     struct new_struct * m = (struct new_struct * ) arg;
     char* new_string = (char*) malloc(strlen(m->s1)+strlen(m->s2)+1);
+    printf("In concat thread \n");
     strcat(new_string,m->s1);
     strcat(new_string,m->s2);
-    int print_index=0;
-    for(print_index=0; print_index<m->a; print_index++)
-    {
-        printf("Printing %d th character %c\n", print_index, *(new_string+print_index));
-    }
+    printf("The concat string is - %s\n\n", new_string);
     myret_t * r = malloc(sizeof(myret_t));
     r->x = 1;
     r->y = new_string;

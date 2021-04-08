@@ -11,53 +11,66 @@
 
 // Node Structure for Storing Commands
 struct PTE{
-    unsigned int PFN: 14;
-    unsigned int valid : 1;
-    unsigned int present : 1;
-    unsigned int protected : 3;
-    unsigned int dirty : 1;
-    unsigned int mode : 1;
+    unsigned int PFN: 14; // a 14 bit VPN
+    unsigned int valid : 1; // a 1 bit valid
+    unsigned int present : 1; // a 1 bit present
+    unsigned int protected : 3; // three bits protected r/w/e
+    unsigned int dirty : 1; // a 1 bit dirty
+    unsigned int mode : 1; // user/kernel mode
 };
 
 struct TLB_Entry{
-    unsigned int VPN: 6;
-    unsigned int PFN: 14;
-    unsigned int protected: 3;
-    unsigned int valid: 1;
-    unsigned int dirty: 1;
-    unsigned int ASID: 8;
-    unsigned int use: 1;
-    unsigned int empty: 1;
+    unsigned int VPN: 6; // a 6 bit VPN
+    unsigned int PFN: 14; // a 14 bit PFN
+    unsigned int protected: 3; // three bits protected r/w/e
+    unsigned int valid: 1; // a 1 bit valid
+    unsigned int dirty: 1; // a 1 bit dirty
+    unsigned int ASID: 8; // 8 bits for ASID of a process
+    unsigned int use: 1; // a 1 bit use
+    unsigned int empty: 1; // bit if entry is empty or not
 };
 
-struct TLB_Entry* TLB;
-int TLB_SIZE;
-int global_ptr;
+struct TLB_Entry* TLB; // array of TLB_Entry
+int TLB_SIZE; // the size of TLB
+int global_ptr; // global ptr for clk
 
+// variables to store access times
+double tot_tlb_acces_time = 0;
+int tot_tlb_access = 0;
+double tot_tlb_miss_time = 0;
+int tot_tlb_misses = 0;
+
+// declaring masks
 uint32_t VPN_MASK = 0xFC00;
 uint32_t PFN_MASK = 0xFFFC00;
 uint32_t SHIFT = 10;
 uint32_t OFFSET_MASK = 0x3FF;
 uint32_t PFN_SHIFT = 10;
 
+// a union structure to denote a page, either a Data or a PTE
+// since we are assuming the Page Table in the main memory
 union Page{
     int data;
     struct PTE page_table_entry;
 };
 
+// page frame structure
 struct PageFrame{
     union Page* pages;
 };
 
+
+// Main Memory struct
 struct MainMemory
 {
    struct PageFrame pf; 
 };
 
+// a main memory 
 struct MainMemory* main_memory;
 int done = 0;
 
-// reset function called on each timer
+// reset function called on each timer, set on each timer
 void reset_use_bits()
 {
      for(int i = 0; i <TLB_SIZE; i++)
@@ -73,6 +86,7 @@ void *threadproc(void *arg)
     while(!done)
     {
         usleep(1000);
+        // call reset function
         reset_use_bits();
     }
     return 0;
@@ -89,9 +103,11 @@ union Page AccessMemory(uint32_t Phy_addr, int pte_bit)
      for(int i=0;i<1000000;i++); // extra time to give real time delays in memory access
     if(pte_bit)
     {
+        // if pte is accessed
         int idx = (Phy_addr/(sizeof(struct PTE)));
         return main_memory[0].pf.pages[idx];
     }
+    // else page is accessed and returned
     int pf_no = (Phy_addr & PFN_MASK) >> PFN_SHIFT;
     int offset = (Phy_addr & OFFSET_MASK);
     return main_memory[pf_no].pf.pages[offset];
@@ -105,15 +121,19 @@ int CanAccess(unsigned int protected_bits)
     return 1;
 }
 
+
+// lookup function , sequentially checks for a table
 struct TLB_Entry TLB_Lookup(uint32_t VPN, int* success){
     for(int i=0;i<TLB_SIZE;i++)
     {
+        // if TLB is not empty
         if(TLB[i].VPN == VPN && TLB[i].empty != 0)
         {
             TLB[i].use = 1;
             return TLB[i];
         }
     }
+    // if not found success to -1
     struct TLB_Entry dummy;
     *success = -1;
     return dummy;
@@ -135,8 +155,10 @@ void clock_algorithm()
     }
 }
 
+// TLB insert function
 void TLB_Insert(uint32_t VPN, uint32_t PFN, unsigned int protected_bits, unsigned int valid)
 {
+    // add a new table
     struct TLB_Entry new_entry;
     new_entry.VPN = VPN;
     new_entry.PFN = PFN;
@@ -144,6 +166,7 @@ void TLB_Insert(uint32_t VPN, uint32_t PFN, unsigned int protected_bits, unsigne
     new_entry.valid = valid;
     new_entry.use = 1;
     new_entry.empty = 1;
+
     if(TLB[global_ptr].empty == 0)
     {
         // empty position
@@ -158,42 +181,72 @@ void TLB_Insert(uint32_t VPN, uint32_t PFN, unsigned int protected_bits, unsigne
 
 }
 
+// convert to physical address 
 uint32_t convert_to_physical(uint32_t virtual_addr)
 {
+    // extract the VPN
     uint32_t VPN = (virtual_addr & VPN_MASK) >> SHIFT;
     int success = 1;
+
+    // declare the clock timers
+    clock_t tlb_start, tlb_end;
+    tlb_start = clock();
     struct TLB_Entry tlb_ret = TLB_Lookup(VPN, &success);
+    tlb_end = clock();
+
+    // add the tlb access time
+    tot_tlb_acces_time += ((tlb_end-tlb_start)*1000000/CLOCKS_PER_SEC);
+    tot_tlb_access ++;
+
     uint32_t offset, PhyAddr;
     if(success != -1)
     {
-        printf("TLB hit!!\n");
+        // printf("TLB hit!!\n");
         if(CanAccess(tlb_ret.protected) == 1)
         {
+            // calculate offfset
             offset = virtual_addr & OFFSET_MASK;
+
+            // calculate offset
             PhyAddr = (tlb_ret.PFN << PFN_SHIFT) | offset;
             AccessMemory(PhyAddr, 0);
             return PhyAddr;
         }else{
+            // if cannot access
             printf("\n\n**PROTECTION_FAULT**\n\n");
             return -1;
         }
     }
-    printf("TLB Miss\n");
+    // printf("TLB Miss\n");
+    clock_t tlb_miss_start, tlb_miss_end;
+    tlb_miss_start = clock();
+    // calculate PTE_Addr
     uint32_t PTE_ADDR = (VPN*sizeof(struct PTE));
+
+    // calculate page table entry
     struct PTE Page_table_entry = AccessMemory(PTE_ADDR, 1).page_table_entry;
+
+    // if not valid
     if(Page_table_entry.valid == 0)
     {
         printf("\n\n**SEGMENTATION_FAULT**\n\n");
         return -1;
     }
+    // if not protected
     if(CanAccess(Page_table_entry.protected) == 0)
     {
         printf("\n\n**PROTECTION_FAULT**\n\n");
         return -1;
     }
-    TLB_Insert(VPN, Page_table_entry.PFN, Page_table_entry.protected, Page_table_entry.valid);
-    return convert_to_physical(virtual_addr);
 
+    // insert the TLB
+    TLB_Insert(VPN, Page_table_entry.PFN, Page_table_entry.protected, Page_table_entry.valid);
+
+    tlb_miss_end = clock();
+    tot_tlb_miss_time += ((tlb_miss_end - tlb_miss_start)*1000)/CLOCKS_PER_SEC;
+    tot_tlb_misses++;
+
+    return convert_to_physical(virtual_addr);
 }
 
 void populate_page_table(int n)
@@ -234,6 +287,7 @@ void populate_page_table(int n)
     }
 }
 
+// to print the address in binary format
 void print_binary(uint32_t address, int virtual)
 {
     int* binary = malloc(sizeof(int)*24);
@@ -244,6 +298,7 @@ void print_binary(uint32_t address, int virtual)
        address = address/2;
        i++;
     }
+    // if virtual then extract VPN
     if(virtual)
     {
         for(int i=8;i<=13;i++)
@@ -252,18 +307,21 @@ void print_binary(uint32_t address, int virtual)
         }
         printf("|");
     }else{
+        // else extract PFN
         for(int i=0;i<=13;i++)
         {
             printf("%d",binary[i]);
         }
         printf("|");
     }
+    // print the rest of the bits
     for(int i=14;i<24;i++) printf("%d", binary[i]);
     printf("\n");
 }
 // random number generator LCG
 uint32_t startState = 0xACEu;
 
+// generate LCG random number
 uint32_t genLCG()
 {
     uint32_t a = 13;
@@ -305,19 +363,19 @@ int main(int argc, char* argv[])
     double* avg_time = malloc(12*(sizeof(double)));
 
     int avg_time_idx = 0;
-
+    // loop for all page numbers
     for(int j=0;j<4;j++){
         n = num_of_pages[j]; 
         uint32_t* arr = (uint32_t*) malloc(n*sizeof(uint32_t));
 
         
         for(int k=0;k<3;k++){
-
+            // loop for all tlb sizes
             TLB_SIZE = tlb_sizes[k];
             printf("Number of pages to be accessed: %d with TLB size %d\n\n\n",n, tlb_sizes[k]);
 
             for(int i=0;i<10;i++){
-
+                // loop for 10 trails
                 TLB = (struct TLB_Entry *) malloc(TLB_SIZE*sizeof(struct TLB_Entry));
                 printf("Trial %d\n\n",i+1);
 
@@ -367,6 +425,9 @@ int main(int argc, char* argv[])
         }
         printf("\n");   
     }
+    printf("\n");
+    printf("Avg TLB Access time (avgd for all trials) - %f us (microseconds)\n",tot_tlb_acces_time/tot_tlb_access);
+    printf("Avg TLB miss time (avgd for all trials) - %f ms\n", tot_tlb_miss_time/tot_tlb_misses);
     printf("Simualtion ended !! \n\n");
     return 0;
 }
