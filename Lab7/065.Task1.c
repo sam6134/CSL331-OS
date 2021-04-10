@@ -15,6 +15,7 @@ int running_thread;
  }
 
 int main(int argc, char * argv[]) {
+   printf("**Compiling Code without using join**\n\n");
     pthread_t p;
     running_thread = 0;
     myarg_t args;

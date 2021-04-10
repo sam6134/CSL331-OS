@@ -56,7 +56,11 @@ int  main(int argc, char * argv[])
     pthread_t p1,p2, p3;
     myret_t* m;
     myarg_t args1,args2;
-
+    if(argc < 3)
+    {
+        printf("\nUsage: ./065.Task2 string1 string2\n\n");
+        return -1;
+    }
     args1.a= strlen(argv[1]);
 
     args1.b=(char *)malloc(strlen(argv[1]));
