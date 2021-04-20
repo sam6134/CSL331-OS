@@ -25,7 +25,7 @@ struct PTE{
 };
 
 struct TLB_Entry{
-    unsigned int VPN: 10; // a 6 bit VPN
+    unsigned int VPN: 10; // a 10 bit VPN
     unsigned int PFN: 14; // a 14 bit PFN
     unsigned int protected: 3; // three bits protected r/w/e
     unsigned int valid: 1; // a 1 bit valid
@@ -378,7 +378,7 @@ uint32_t genLCG()
     startState = (a*startState + c)%m;
     uint32_t ret_val = startState;
     uint32_t pfn = (startState & VPN_MASK) >> SHIFT;
-    // 80, 20 workload
+    // 80, 20 workload (80% hot pages and 20% cold)
     if(rand()%10 < 8) pfn = 480 + rand()%32;
     else pfn = (pfn%512); // to make generated pfn's under 512
     ret_val = (pfn << PFN_SHIFT) | (ret_val & OFFSET_MASK);
@@ -389,9 +389,9 @@ int main(int argc, char* argv[])
 {
     printf("\n");
     printf("**************************************************************\n\n");
-    printf("CSL331 Project-3 © Samarth Singh\n\n");
+    printf("CSL331 Project-3 (MultiLevel PageTable) © Samarth Singh\n\n");
     printf("The page number and offsets are separated by | for better visibility.\n");
-    printf("This simulation only provides address translations with TLB buffer size chosen by the user.\n To give realistic delays in memory access a sleep of 1 sec is added on every successful address transaltion from page Table\n");
+    printf("This simulation only provides address translations with TLB buffer size chosen by the user.\n To give realistic delays in memory access is added \n");
     printf("**************************************************************\n\n");
     
     global_ptr = 0;
